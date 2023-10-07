@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -142,7 +141,7 @@ type container struct {
 	restore    bool
 	spec       generate.Generator
 	pidns      nsmgr.Namespace
-	mounts     map[string]*rspec.Mount
+	mountInfo  *mountInfo
 }
 
 // New creates a new, empty Sandbox instance
@@ -152,7 +151,8 @@ func New() (Container, error) {
 		return nil, err
 	}
 	return &container{
-		spec: spec,
+		spec:      spec,
+		mountInfo: NewMountInfo(),
 	}, nil
 }
 
@@ -164,30 +164,43 @@ func (c *container) SpecAddMounts(ctx context.Context, resourceStore *resourcest
 	if err != nil {
 		return nil, nil, err
 	}
+	/*
+		allMounts := make([]*rspec.Mount, 0, len(c.mounts))
 
-	allMounts := make([]*rspec.Mount, len(c.mounts))
+		//Filter out /dev & /sys
+		devSet, sysSet := false, false
+		for _, m := range c.Config().Mounts {
+			if dest == "/dev" {
+				devSet = true
+			}
+			if dest == "/sys" {
+				sysSet = true
+			}
+			allMounts = append(allMounts, m)
+		}
 
-	//Filter out /dev & /sys
-	devSet, sysSet := false, false
-	for dest, m := range c.mounts {
-		if dest == "/dev" {
-			devSet = true
+		log.Infof(ctx, "chasan testing", allMounts)
+		sort.Sort(orderedMounts(allMounts))
+		for _, m := range c.mounts {
+			if devSet && strings.HasPrefix(m.Destination, "/dev/") {
+				continue
+			}
+			if sysSet && strings.HasPrefix(m.Destination, "/sys/") {
+				continue
+			}
+			c.spec.RemoveMount(m.Destination)
+			c.spec.AddMount(*m)
 		}
-		if dest == "/sys" {
-			sysSet = true
-		}
-		allMounts = append(allMounts, m)
+	*/
+
+	// Add all mounts to specgen
+	for _, m := range c.mountInfo.mounts {
+		//c.spec.RemoveMount(m.Destination)
+		c.spec.AddMount(*m)
 	}
 
-	sort.Sort(orderedMounts(allMounts))
-	for _, m := range allMounts {
-		if devSet && strings.HasPrefix(m.Destination, "/dev/") {
-			continue
-		}
-		if sysSet && strings.HasPrefix(m.Destination, "/sys/") {
-			continue
-		}
-		c.spec.RemoveMount(m.Destination)
+	// Add crimounts to specgen
+	for _, m := range c.mountInfo.criMounts {
 		c.spec.AddMount(*m)
 	}
 
