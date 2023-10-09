@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -165,8 +166,9 @@ func (c *container) SpecAddMounts(ctx context.Context, resourceStore *resourcest
 		return nil, nil, err
 	}
 
-	// Add mounts to specgen
-	for _, m := range c.mountInfo.mounts {
+	// Sort & Add mounts to specgen
+	sort.Sort(orderedMounts(c.mountInfo.allmounts))
+	for _, m := range c.mountInfo.allmounts {
 		c.spec.AddMount(*m)
 	}
 
